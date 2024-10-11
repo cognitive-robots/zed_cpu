@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////
+﻿///////////////////////////////////////////////////////////////////////////
 //
 // Copyright (c) 2021, STEREOLABS.
 //
@@ -29,15 +29,19 @@
 
 #define LOG_SEP ","
 
+#ifdef VIDEO_MOD_AVAILABLE
+
 #include "videocapture_def.hpp"
 
 namespace sl_oc {
 
 
 
+#ifdef SENSORS_MOD_AVAILABLE
 namespace sensors {
 class SensorCapture;
 }
+#endif
 
 namespace video {
 
@@ -353,7 +357,32 @@ public:
      */
     inline int getDeviceId(){return mDevId;}
 
+#ifdef SENSOR_LOG_AVAILABLE
+    /*!
+     * \brief Start logging to file of AEG/AGC camera registers
+     * \param enable set to true to enable logging
+     * \param frame_skip number of frames to skip when logging to file
+     * \return true if log file can be correctly created/closed
+     */
+    bool enableAecAgcSensLogging(bool enable, int frame_skip=10);
 
+    /*!
+     * \brief Save all ISP camera registers into a file
+     * \param filename csv filename
+     * \note CSV file will contain Adress , L value, R value
+     */
+    void saveAllISPRegisters(std::string filename);
+
+    /*!
+     * \brief Save all sensors ctrl register
+     * \param filename csv filename
+     * \note CSV file will contain Adress , L value, R value
+     */
+    void saveAllSensorsRegisters(std::string filename);
+#endif
+
+
+#ifdef SENSORS_MOD_AVAILABLE
     /*!
      * \brief Enable synchronizations between Camera frame and Sensors timestamps
      * \param sensCap pointer to  SensorCapture object
@@ -366,6 +395,7 @@ public:
      *        be synchronized to the last Sensor Data
      */
     inline void setReadyToSync(){ mSensReadyToSync=true; }
+#endif
 
         bool resetAGCAECregisters();
 
@@ -440,6 +470,11 @@ private:
         return std::string(buf);
     }
 
+#ifdef SENSOR_LOG_AVAILABLE
+    void saveLogDataLeft();
+    void saveLogDataRight();
+#endif
+
 private:
     // Flags
     bool mNewFrame=false;               //!< Indicates if a new frame is available
@@ -478,15 +513,30 @@ private:
 
     bool mFirstFrame=true;              //!< Used to initialize the timestamp start point
 
+#ifdef SENSOR_LOG_AVAILABLE
+    // ----> Registers logging
+    bool mLogEnable=false;
+    std::string mLogFilenameLeft;
+    std::string mLogFilenameRight;
+    std::ofstream mLogFileLeft;
+    std::ofstream mLogFileRight;
+    int mLogFrameSkip=10;
+    // <---- Registers logging
+#endif
+
+
+#ifdef SENSORS_MOD_AVAILABLE
     bool mSyncEnabled=false;            //!< Indicates if a  SensorCapture object is synchronized
     sensors::SensorCapture* mSensPtr;   //!< Pointer to the synchronized  SensorCapture object
 
     bool mSensReadyToSync=false;        //!< Indicates if the MCU received a HW sync signal
+#endif
 };
 
 }
 
 }
+#endif
 
 /** \example zed_oc_video_example.cpp
  * Example of how to use the VideoCapture class to get raw video frames and show the stream on screen using the

@@ -28,14 +28,18 @@
 #include <map>
 #include <mutex>
 
+#ifdef SENSORS_MOD_AVAILABLE
+
 #include "sensorcapture_def.hpp"
 #include "hidapi.h"
 
 namespace sl_oc {
 
+#ifdef VIDEO_MOD_AVAILABLE
 namespace video {
 class VideoCapture;
 }
+#endif
 
 namespace sensors {
 
@@ -220,9 +224,11 @@ public:
      */
     static bool resetVideoModule(int serial_number=0);
 
+#ifdef VIDEO_MOD_AVAILABLE
     void updateTimestampOffset(uint64_t frame_ts);                                 //!< Called by  VideoCapture to update timestamp offset
     inline void setStartTimestamp(uint64_t start_ts){mStartSysTs=start_ts;}        //!< Called by  VideoCapture to sync timestamps reference point
     inline void setVideoPtr(video::VideoCapture* videoPtr){mVideoPtr=videoPtr;}    //!< Called by  VideoCapture to set the pointer to it
+#endif
 
 private:
     static bool searchForConnectedDev(int* serial_number, unsigned short* found_pid); //!< Search for a device and returns its pid and serial number
@@ -291,14 +297,17 @@ private:
     int64_t mSyncOffset=0;              //!< Timestamp offset respect to synchronized camera
     // <---- Timestamp synchronization
 
+#ifdef VIDEO_MOD_AVAILABLE
     video::VideoCapture* mVideoPtr=nullptr;    //!< Pointer to the synchronized SensorCapture object
     uint64_t mSyncTs=0;                 //!< Timestamp of the latest received HW sync signal
+#endif
 
 };
 
 }
 }
 
+#endif
 
 /** \example zed_oc_sensors_example.cpp
  * Example of how to use the SensorCapture class to get the raw sensors data at the maximum available

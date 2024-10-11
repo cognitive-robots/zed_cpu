@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.1)
 project(zed_cpu)
 
-add_compile_options(-std=c++14)
+add_compile_options(-std=c++17)
+
+add_definitions(-DSENSORS_MOD_AVAILABLE)
+add_definitions(-DVIDEO_MOD_AVAILABLE)
 
 # Raspberry Pi 4 - OS 64bit
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")

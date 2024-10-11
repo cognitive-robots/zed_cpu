@@ -19,7 +19,11 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "zed_lib/sensorcapture.hpp"
+
+#ifdef VIDEO_MOD_AVAILABLE
+
 #include "zed_lib/videocapture.hpp"
+#endif
 
 #include <sstream>
 #include <cmath>              // for round
@@ -435,6 +439,7 @@ void SensorCapture::grabThreadFunc()
                     // Count the number of completed time shift factor estimations
                     mNTPAdjustedCount++;
 
+#ifdef VIDEO_MOD_AVAILABLE
                     // ----> Signal update offset to VideoCapture
                     if(mVideoPtr)
                     {
@@ -442,6 +447,7 @@ void SensorCapture::grabThreadFunc()
                         mVideoPtr->setReadyToSync();
                     }
                     // <---- Update offset
+#endif //VIDEO_MOD_AVAILABLE
                 }
             }
         }
@@ -553,6 +559,7 @@ void SensorCapture::grabThreadFunc()
     mGrabRunning = false;
 }
 
+#ifdef VIDEO_MOD_AVAILABLE
 void SensorCapture::updateTimestampOffset( uint64_t frame_ts)
 {
     static int64_t offset_sum = 0;
@@ -573,6 +580,7 @@ void SensorCapture::updateTimestampOffset( uint64_t frame_ts)
         count=0;
     }
 }
+#endif
 
 bool SensorCapture::sendPing() {
     if( !mDevHandle )
