@@ -4,7 +4,9 @@
 #include <memory>
 #include <vector>
 
+#include <camera_info_manager/camera_info_manager.h>
 #include <cv_bridge/cv_bridge.h>
+#include <image_transport/camera_publisher.h>
 #include <image_transport/image_transport.h>
 #include <opencv2/opencv.hpp>
 #include <ros/ros.h>
@@ -40,6 +42,22 @@ namespace zed_cpu {
       ROS_WARN_STREAM("No frame rate specified, defaulting to '" << frame_rate_ << "'.");
     }
 
+    std::string left_camera_calibration_url {};
+    if (nh_->hasParam("left_camera_calibration_url")) {
+      nh_->getParam("left_camera_calibration_url", left_camera_calibration_url);
+    } else {
+      ROS_FATAL_STREAM("No camera calibration URL for left camera specified!");
+      ros::shutdown();
+    }
+
+    std::string right_camera_calibration_url {};
+    if (nh_->hasParam("right_camera_calibration_url")) {
+      nh_->getParam("right_camera_calibration_url", right_camera_calibration_url);
+    } else {
+      ROS_FATAL_STREAM("No camera calibration URL for right camera specified!");
+      ros::shutdown();
+    }
+
     if (nh->hasParam("left_camera_frame")) {
       nh_->getParam("left_camera_frame", left_camera_frame_);
     } else {
@@ -73,8 +91,12 @@ namespace zed_cpu {
     initImu(serial_number_);
 
 
-    left_image_pub_ = it_->advertise("left_image", 1);
-    right_image_pub_ = it_->advertise("right_image", 1);
+    left_camera_pub_ = it_->advertiseCamera("left/image_raw", 1);
+    right_camera_pub_ = it_->advertiseCamera("right/image_raw", 1);
+    ros::NodeHandle left_nh {"left"};
+    left_info_manager_ = std::make_shared<camera_info_manager::CameraInfoManager>(left_nh, "camera/left", left_camera_calibration_url);
+    ros::NodeHandle right_nh {"right"};
+    right_info_manager_ = std::make_shared<camera_info_manager::CameraInfoManager>(right_nh, "camera/right", right_camera_calibration_url);
     imu_pub_ = nh_->advertise<sensor_msgs::Imu>("imu_data", 1);
     image_timer_ = nh_->createTimer(ros::Duration(1.0/frame_rate_), [this](ros::TimerEvent const&) {
       this->publishImages();
@@ -181,8 +203,10 @@ namespace zed_cpu {
       right_img_header.frame_id = right_camera_frame_;
       sensor_msgs::ImagePtr const right_msg {cv_bridge::CvImage(right_img_header, "bgr8", right_img).toImageMsg()};
 
-      left_image_pub_.publish(left_msg);
-      right_image_pub_.publish(right_msg);
+      sensor_msgs::CameraInfo const left_camera_info_msg {left_info_manager_->getCameraInfo()};
+      sensor_msgs::CameraInfo const right_camera_info_msg {right_info_manager_->getCameraInfo()};
+      left_camera_pub_.publish(*left_msg, left_camera_info_msg);
+      right_camera_pub_.publish(*right_msg, right_camera_info_msg);
     }
     return;
   }

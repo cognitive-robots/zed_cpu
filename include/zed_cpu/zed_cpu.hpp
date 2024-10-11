@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include <camera_info_manager/camera_info_manager.h>
+#include <image_transport/camera_publisher.h>
 #include <image_transport/image_transport.h>
 #include <ros/ros.h>
 
@@ -34,8 +36,10 @@ namespace zed_cpu {
       std::string imu_frame_;
       std::unique_ptr<sl_oc::video::VideoCapture> cap_;
       std::unique_ptr<sl_oc::sensors::SensorCapture> sens_;
-      image_transport::Publisher left_image_pub_;
-      image_transport::Publisher right_image_pub_;
+      std::shared_ptr<camera_info_manager::CameraInfoManager> left_info_manager_;
+      std::shared_ptr<camera_info_manager::CameraInfoManager> right_info_manager_;
+      image_transport::CameraPublisher left_camera_pub_;
+      image_transport::CameraPublisher right_camera_pub_;
       ros::Publisher imu_pub_;
       ros::Timer image_timer_;
       ros::Timer imu_timer_;

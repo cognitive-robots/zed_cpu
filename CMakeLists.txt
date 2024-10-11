@@ -21,6 +21,7 @@ endif()
 list(INSERT CMAKE_MODULE_PATH 0 "${PROJECT_SOURCE_DIR}/cmake")
 
 find_package(catkin REQUIRED COMPONENTS
+  camera_info_manager
   cv_bridge
   image_transport
   roscpp
