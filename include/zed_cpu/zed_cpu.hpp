@@ -17,7 +17,7 @@ namespace zed_cpu {
                     std::shared_ptr<image_transport::ImageTransport> const& it);
 
     protected:
-      void initCamera(int const device_id, sl_oc::video::RESOLUTION const resolution,
+      void initCamera(int const serial_number, sl_oc::video::RESOLUTION const resolution,
                        sl_oc::video::FPS const fps);
       void initImu(int const serial_number);
       void publishImages();
@@ -25,7 +25,6 @@ namespace zed_cpu {
 
       std::shared_ptr<ros::NodeHandle> nh_;
       std::shared_ptr<image_transport::ImageTransport> it_;
-      int device_id_;
       int serial_number_;
       int resolution_;
       int frame_rate_;

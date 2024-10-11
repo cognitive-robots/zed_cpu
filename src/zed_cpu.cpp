@@ -1,5 +1,6 @@
 #include <zed_cpu.hpp>
 
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -18,13 +19,6 @@ namespace zed_cpu {
                               std::shared_ptr<image_transport::ImageTransport> const& it)
     : nh_(nh), it_(it) {
     // Parameter parsing
-    if (nh_->hasParam("device_id")) {
-      nh_->getParam("device_id", device_id_);
-    } else {
-      ROS_FATAL_STREAM("No device specified!");
-      ros::shutdown();
-    }
-
     if (nh_->hasParam("serial_number")) {
       nh_->getParam("serial_number", serial_number_);
     } else {
@@ -74,7 +68,7 @@ namespace zed_cpu {
       ROS_WARN_STREAM("No IMU frame specified, defaulting to '" << imu_frame_ << "'.");
     }
 
-    initCamera(device_id_, static_cast<sl_oc::video::RESOLUTION>(resolution_),
+    initCamera(serial_number_, static_cast<sl_oc::video::RESOLUTION>(resolution_),
                static_cast<sl_oc::video::FPS>(frame_rate_));
     initImu(serial_number_);
 
@@ -92,12 +86,38 @@ namespace zed_cpu {
     return;
   }
 
-  void ZedCameraNode::initCamera(int const device_id, sl_oc::video::RESOLUTION const resolution,
+  void ZedCameraNode::initCamera(int const serial_number, sl_oc::video::RESOLUTION const resolution,
                                 sl_oc::video::FPS const fps) {
     sl_oc::video::VideoParams params {};
     params.res = resolution;
     params.fps = fps;
     params.verbose = sl_oc::VERBOSITY::ERROR;
+
+    // Find device id from serial number
+    int device_id {-1};
+    std::vector<std::string> video_devices {};
+    std::filesystem::path dev_path {"/dev/"};
+    for (auto const& entry: std::filesystem::directory_iterator(dev_path)) {
+        std::string const filename {entry.path().filename().string()};
+        sl_oc::video::VideoParams test_params {};
+        test_params.verbose = sl_oc::VERBOSITY::NONE;
+        if (filename.find("video") == 0) {
+          auto test_capture {std::make_unique<sl_oc::video::VideoCapture>(test_params)};
+          int const test_device_id {std::stoi(filename.substr(5))};
+          test_capture->initializeVideo(test_device_id);
+          auto const test_serial_number {test_capture->getSerialNumber()};
+          if (test_serial_number == serial_number) {
+            device_id = test_device_id;
+            ROS_INFO_STREAM("Found device with serial number " << serial_number << "!");
+            break;
+          }
+        }
+    }
+    if (device_id == -1) {
+      ROS_ERROR_STREAM("Could not find device with serial number " << serial_number << "!");
+      ros::shutdown();
+      return;
+    }
 
     cap_ = std::make_unique<sl_oc::video::VideoCapture>(params);
     if (!cap_->initializeVideo(device_id)) {
