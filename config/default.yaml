@@ -1,0 +1,10 @@
+device_id: -1
+serial_number: 36034883
+
+resolution: 1
+frame_rate: 15
+imu_rate: 200
+
+left_camera_frame: "front_zed_left_camera_optical_frame"
+right_camera_frame: "front_zed_right_camera_optical_frame"
+imu_frame: "front_zed_imu_link"
