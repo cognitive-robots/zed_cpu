@@ -1,5 +1,6 @@
 #include "zed_cpu.h"
 
+#include <cmath>
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -17,6 +18,12 @@
 
 
 namespace zed_cpu {
+
+  template <typename T>
+  constexpr T degToRad(T const degrees) noexcept {
+    constexpr double degrees_to_radius {M_PI/180.0};
+    return degrees*degrees_to_radius;
+  }
 
   ZedCameraNode::ZedCameraNode(std::shared_ptr<ros::NodeHandle> const& nh,
                                std::shared_ptr<image_transport::ImageTransport> const& it)
@@ -212,12 +219,14 @@ namespace zed_cpu {
   }
 
   void ZedCameraNode::publishImu() {
-    sl_oc::sensors::data::Imu const imu_data {imu_capture_->getLastIMUData(2500)}; // Timeout of 2.5ms
+    // Request the time stamp before requesting the IMU measurement (including transport delay)
+    ros::Time const stamp {ros::Time::now()} ;
+    sl_oc::sensors::data::Imu const imu_data {imu_capture_->getLastIMUData(1000)}; // Timeout of 1ms
 
     if (imu_data.valid == sl_oc::sensors::data::Imu::NEW_VAL) {
       sensor_msgs::Imu imu_msg {};
-      ros::Time stamp {};
-      stamp.fromNSec(imu_data.timestamp);
+      // The time stamps reported by the driver seem to be unreliable and drift over time!
+      // stamp.fromNSec(imu_data.timestamp);
       imu_msg.header.stamp = stamp;
       imu_msg.header.frame_id = imu_frame_;
 
@@ -225,9 +234,9 @@ namespace zed_cpu {
       imu_msg.linear_acceleration.y = imu_data.aY;
       imu_msg.linear_acceleration.z = imu_data.aZ;
 
-      imu_msg.angular_velocity.x = imu_data.gX;
-      imu_msg.angular_velocity.y = imu_data.gY;
-      imu_msg.angular_velocity.z = imu_data.gZ;
+      imu_msg.angular_velocity.x = degToRad(imu_data.gX);
+      imu_msg.angular_velocity.y = degToRad(imu_data.gY);
+      imu_msg.angular_velocity.z = degToRad(imu_data.gZ);
 
       imu_pub_.publish(imu_msg);
     } else {
