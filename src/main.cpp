@@ -3,7 +3,7 @@
 
 #include <ros/ros.h>
 
-#include "zed_cpu.hpp"
+#include "zed_cpu.h"
 
 
 int main(int argc, char * argv[]) {

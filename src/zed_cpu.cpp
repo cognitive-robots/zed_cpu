@@ -1,4 +1,4 @@
-#include <zed_cpu.hpp>
+#include "zed_cpu.h"
 
 #include <filesystem>
 #include <memory>
@@ -15,10 +15,11 @@
 #include <zed_lib/sensorcapture.hpp>
 #include <zed_lib/videocapture.hpp>
 
+
 namespace zed_cpu {
 
   ZedCameraNode::ZedCameraNode(std::shared_ptr<ros::NodeHandle> const& nh,
-                              std::shared_ptr<image_transport::ImageTransport> const& it)
+                               std::shared_ptr<image_transport::ImageTransport> const& it)
     : nh_(nh), it_(it) {
     // Parameter parsing
     if (nh_->hasParam("serial_number")) {
@@ -90,13 +91,12 @@ namespace zed_cpu {
                static_cast<sl_oc::video::FPS>(frame_rate_));
     initImu(serial_number_);
 
-
     left_camera_pub_ = it_->advertiseCamera("left/image_raw", 1);
     right_camera_pub_ = it_->advertiseCamera("right/image_raw", 1);
     ros::NodeHandle left_nh {"left"};
-    left_info_manager_ = std::make_shared<camera_info_manager::CameraInfoManager>(left_nh, "camera/left", left_camera_calibration_url);
+    left_camera_info_manager_ = std::make_unique<camera_info_manager::CameraInfoManager>(left_nh, "camera/left", left_camera_calibration_url);
     ros::NodeHandle right_nh {"right"};
-    right_info_manager_ = std::make_shared<camera_info_manager::CameraInfoManager>(right_nh, "camera/right", right_camera_calibration_url);
+    right_camera_info_manager_ = std::make_unique<camera_info_manager::CameraInfoManager>(right_nh, "camera/right", right_camera_calibration_url);
     imu_pub_ = nh_->advertise<sensor_msgs::Imu>("imu_data", 1);
     image_timer_ = nh_->createTimer(ros::Duration(1.0/frame_rate_), [this](ros::TimerEvent const&) {
       this->publishImages();
@@ -110,15 +110,9 @@ namespace zed_cpu {
 
   void ZedCameraNode::initCamera(int const serial_number, sl_oc::video::RESOLUTION const resolution,
                                 sl_oc::video::FPS const fps) {
-    sl_oc::video::VideoParams params {};
-    params.res = resolution;
-    params.fps = fps;
-    params.verbose = sl_oc::VERBOSITY::ERROR;
-
     // Find device id from serial number
     int device_id {-1};
-    std::vector<std::string> video_devices {};
-    std::filesystem::path dev_path {"/dev/"};
+    std::filesystem::path const dev_path {"/dev/"};
     for (auto const& entry: std::filesystem::directory_iterator(dev_path)) {
         std::string const filename {entry.path().filename().string()};
         sl_oc::video::VideoParams test_params {};
@@ -141,54 +135,58 @@ namespace zed_cpu {
       return;
     }
 
-    cap_ = std::make_unique<sl_oc::video::VideoCapture>(params);
-    if (!cap_->initializeVideo(device_id)) {
+    sl_oc::video::VideoParams params {};
+    params.res = resolution;
+    params.fps = fps;
+    params.verbose = sl_oc::VERBOSITY::ERROR;
+    video_capture_ = std::make_unique<sl_oc::video::VideoCapture>(params);
+    if (!video_capture_->initializeVideo(device_id)) {
       ROS_ERROR_STREAM("Failed to open camera video capture on device '" << device_id << "'!");
       ros::shutdown();
       return;
     }
 
-    ROS_INFO_STREAM("Connected to device '" << device_id << "' with device name " << cap_->getDeviceName()
-                    << " and serial number " << cap_->getSerialNumber());
+    ROS_INFO_STREAM("Connected to device '" << device_id << "' with device name " << video_capture_->getDeviceName()
+                    << " and serial number " << video_capture_->getSerialNumber());
     return;
   }
 
   void ZedCameraNode::initImu(int const serial_number) {
-    sens_ = std::make_unique<sl_oc::sensors::SensorCapture>(sl_oc::VERBOSITY::ERROR);
+    imu_capture_ = std::make_unique<sl_oc::sensors::SensorCapture>(sl_oc::VERBOSITY::ERROR);
 
-    std::vector<int> const devs = sens_->getDeviceList();
-    if (devs.size() == 0) {
+    std::vector<int> const devices {imu_capture_->getDeviceList()};
+    if (devices.size() == 0) {
       ROS_FATAL_STREAM("No available ZED 2, ZED 2i or ZED Mini cameras found!");
       ros::shutdown();
       return;
     }
 
-    uint16_t fw_maior {};
-    uint16_t fw_minor {};
-    sens_->getFirmwareVersion(fw_maior, fw_minor);
-    ROS_INFO_STREAM("Connected to IMU of device " << serial_number << " with firmware version: " << 
-                    fw_maior << "." << fw_minor);
-
-    if (!sens_->initializeSensors(serial_number)) {
+    if (!imu_capture_->initializeSensors(serial_number)) {
       ROS_FATAL_STREAM("Failed to initialize IMU of device " << serial_number);
       ros::shutdown();
       return;
     }
+
+    std::uint16_t major_version {};
+    std::uint16_t minor_version {};
+    imu_capture_->getFirmwareVersion(major_version, minor_version);
+    ROS_INFO_STREAM("Connected to IMU of device " << serial_number << " with firmware version: " << 
+                    major_version << "." << minor_version);
     return;
   }
 
   void ZedCameraNode::publishImages() {
-    sl_oc::video::Frame const frame {cap_->getLastFrame()};
+    sl_oc::video::Frame const frame {video_capture_->getLastFrame()};
 
     // We had the issue previously that when starting the driver sometimes just green frames would be shown
     // with a timestamp of 0
     if (frame.data != nullptr && frame.timestamp != 0) {
-      cv::Mat const frame_yuv = cv::Mat(frame.height, frame.width, CV_8UC2, frame.data);
+      cv::Mat const frame_yuv {cv::Mat(frame.height, frame.width, CV_8UC2, frame.data)};
       cv::Mat frame_bgr {};
       cv::cvtColor(frame_yuv, frame_bgr, cv::COLOR_YUV2BGR_YUYV);
 
-      cv::Mat const left_img = frame_bgr(cv::Rect(0, 0, frame_bgr.cols / 2, frame_bgr.rows));
-      cv::Mat const right_img = frame_bgr(cv::Rect(frame_bgr.cols / 2, 0, frame_bgr.cols / 2, frame_bgr.rows));
+      cv::Mat const left_img {frame_bgr(cv::Rect(0, 0, frame_bgr.cols / 2, frame_bgr.rows))};
+      cv::Mat const right_img {frame_bgr(cv::Rect(frame_bgr.cols / 2, 0, frame_bgr.cols / 2, frame_bgr.rows))};
 
       ros::Time stamp {};
       stamp.fromNSec(frame.timestamp);
@@ -203,20 +201,21 @@ namespace zed_cpu {
       right_img_header.frame_id = right_camera_frame_;
       sensor_msgs::ImagePtr const right_msg {cv_bridge::CvImage(right_img_header, "bgr8", right_img).toImageMsg()};
 
-      sensor_msgs::CameraInfo const left_camera_info_msg {left_info_manager_->getCameraInfo()};
-      sensor_msgs::CameraInfo const right_camera_info_msg {right_info_manager_->getCameraInfo()};
+      sensor_msgs::CameraInfo const left_camera_info_msg {left_camera_info_manager_->getCameraInfo()};
+      sensor_msgs::CameraInfo const right_camera_info_msg {right_camera_info_manager_->getCameraInfo()};
       left_camera_pub_.publish(*left_msg, left_camera_info_msg);
       right_camera_pub_.publish(*right_msg, right_camera_info_msg);
+    } else {
+      ROS_WARN_STREAM("Failed to read camera frame!");
     }
     return;
   }
 
   void ZedCameraNode::publishImu() {
-    const sl_oc::sensors::data::Imu imu_data = sens_->getLastIMUData(2500); // Timeout of 2.5ms
+    sl_oc::sensors::data::Imu const imu_data {imu_capture_->getLastIMUData(2500)}; // Timeout of 2.5ms
 
     if (imu_data.valid == sl_oc::sensors::data::Imu::NEW_VAL) {
       sensor_msgs::Imu imu_msg {};
-      // imu_msg.header.stamp = ros::Time::now();
       ros::Time stamp {};
       stamp.fromNSec(imu_data.timestamp);
       imu_msg.header.stamp = stamp;
@@ -231,6 +230,8 @@ namespace zed_cpu {
       imu_msg.angular_velocity.z = imu_data.gZ;
 
       imu_pub_.publish(imu_msg);
+    } else {
+      ROS_WARN_STREAM("Failed to read IMU measurement!");
     }
     return;
   }

@@ -20,7 +20,7 @@ namespace zed_cpu {
 
     protected:
       void initCamera(int const serial_number, sl_oc::video::RESOLUTION const resolution,
-                       sl_oc::video::FPS const fps);
+                      sl_oc::video::FPS const fps);
       void initImu(int const serial_number);
       void publishImages();
       void publishImu();
@@ -34,10 +34,10 @@ namespace zed_cpu {
       std::string left_camera_frame_;
       std::string right_camera_frame_;
       std::string imu_frame_;
-      std::unique_ptr<sl_oc::video::VideoCapture> cap_;
-      std::unique_ptr<sl_oc::sensors::SensorCapture> sens_;
-      std::shared_ptr<camera_info_manager::CameraInfoManager> left_info_manager_;
-      std::shared_ptr<camera_info_manager::CameraInfoManager> right_info_manager_;
+      std::unique_ptr<sl_oc::video::VideoCapture> video_capture_;
+      std::unique_ptr<sl_oc::sensors::SensorCapture> imu_capture_;
+      std::unique_ptr<camera_info_manager::CameraInfoManager> left_camera_info_manager_;
+      std::unique_ptr<camera_info_manager::CameraInfoManager> right_camera_info_manager_;
       image_transport::CameraPublisher left_camera_pub_;
       image_transport::CameraPublisher right_camera_pub_;
       ros::Publisher imu_pub_;
