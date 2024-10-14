@@ -230,6 +230,7 @@ namespace zed_cpu {
       imu_msg.header.stamp = stamp;
       imu_msg.header.frame_id = imu_frame_;
 
+      // The coordinate system is oriented x down, y to the right and z backwards
       imu_msg.linear_acceleration.x = imu_data.aX;
       imu_msg.linear_acceleration.y = imu_data.aY;
       imu_msg.linear_acceleration.z = imu_data.aZ;
